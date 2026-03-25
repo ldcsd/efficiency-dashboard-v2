@@ -995,25 +995,42 @@
     let deferredPrompt = null;
     const installBanner = document.getElementById('install-banner');
 
+    // Check if dismissed
+    const installDismissed = localStorage.getItem('install_dismissed');
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
+    if (!installDismissed && !isStandalone) {
+        // Show banner on load for all users (not just mobile)
+        setTimeout(() => installBanner.classList.add('show'), 1500);
+    }
+
+    // Listen for PWA install prompt (Chrome/Android)
     window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
         deferredPrompt = e;
-        // Show banner after a short delay if not already dismissed
-        if (!localStorage.getItem('install_dismissed')) {
-            setTimeout(() => installBanner.classList.add('show'), 2000);
+        if (!installDismissed && !isStandalone) {
+            installBanner.classList.add('show');
         }
     });
 
     function installApp() {
+        // If we have the native prompt, use it
         if (deferredPrompt) {
             deferredPrompt.prompt();
             deferredPrompt.userChoice.then((choice) => {
-                if (choice.outcome === 'accepted') {
-                    console.log('App installed');
-                }
                 deferredPrompt = null;
                 installBanner.classList.remove('show');
             });
+        } else {
+            // Fallback: show instructions
+            const isIos = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
+            if (isIos) {
+                alert('请点击浏览器底部的"分享"按钮 → 选择"添加到主屏幕"');
+            } else if (/android/.test(navigator.userAgent.toLowerCase())) {
+                alert('请点击浏览器右上角菜单 → 选择"添加到主屏幕"或"安装应用"');
+            } else {
+                alert('请点击浏览器地址栏右侧的安装图标 ⊕，或使用菜单中的"安装应用"选项');
+            }
         }
     }
 
@@ -1022,20 +1039,11 @@
         localStorage.setItem('install_dismissed', 'true');
     }
 
-    // Hide banner if already installed
+    // Hide if already installed
     window.addEventListener('appinstalled', () => {
         installBanner.classList.remove('show');
         deferredPrompt = null;
     });
-
-    // For iOS Safari (no beforeinstallprompt)
-    const isIos = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-    if (isIos && !isStandalone && !localStorage.getItem('install_dismissed')) {
-        document.getElementById('install-btn').textContent = '添加';
-        document.querySelector('.install-banner-desc').textContent = '点击添加，然后选"添加到主屏幕"';
-        setTimeout(() => installBanner.classList.add('show'), 2000);
-    }
 
     // ========== PWA Service Worker ==========
     if ('serviceWorker' in navigator) {
