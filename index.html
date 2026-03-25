@@ -1022,16 +1022,46 @@
                 installBanner.classList.remove('show');
             });
         } else {
-            // Fallback: show instructions
+            // No native prompt - try to trigger it or show a simple inline guide
             const isIos = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
             if (isIos) {
-                alert('请点击浏览器底部的"分享"按钮 → 选择"添加到主屏幕"');
-            } else if (/android/.test(navigator.userAgent.toLowerCase())) {
-                alert('请点击浏览器右上角菜单 → 选择"添加到主屏幕"或"安装应用"');
+                installBanner.classList.remove('show');
+                // Show inline iOS guide
+                showIOSGuide();
             } else {
-                alert('请点击浏览器地址栏右侧的安装图标 ⊕，或使用菜单中的"安装应用"选项');
+                // Try Chrome's install-related feature detection
+                // Some browsers support install without the event
+                if (window.navigator && window.navigator.getInstalledRelatedApps) {
+                    alert('此浏览器不支持直接安装，请尝试使用 Chrome 或 Edge 浏览器打开此页面。');
+                } else {
+                    // Generic helpful message
+                    alert('请在浏览器菜单中查找"安装应用"或"添加到主屏幕"选项。\n\n推荐使用 Chrome 或 Edge 浏览器获得最佳安装体验。');
+                }
             }
         }
+    }
+
+    // iOS specific guide overlay
+    function showIOSGuide() {
+        const overlay = document.createElement('div');
+        overlay.id = 'ios-guide';
+        overlay.innerHTML = `
+            <div class="ios-guide-content">
+                <div style="font-size:2.5rem;margin-bottom:12px;">📱</div>
+                <div style="font-size:1.1rem;font-weight:600;margin-bottom:8px;">添加到主屏幕</div>
+                <div style="font-size:0.9rem;color:var(--text-dim);line-height:1.8;text-align:left;">
+                    1. 点击底部中间的 <strong style="color:var(--accent);">分享</strong> 按钮 <span style="font-size:1.2rem;">⬆️</span><br>
+                    2. 向下滑动找到 <strong style="color:var(--accent);">"添加到主屏幕"</strong><br>
+                    3. 点击右上角 <strong style="color:var(--accent);">"添加"</strong>
+                </div>
+                <button class="install-btn" style="margin-top:16px;width:100%;" onclick="document.getElementById('ios-guide').remove()">我知道了</button>
+            </div>
+        `;
+        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;';
+        const content = overlay.querySelector('.ios-guide-content');
+        content.style.cssText = 'background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px 24px;max-width:320px;width:90%;text-align:center;';
+        document.body.appendChild(overlay);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
     }
 
     function dismissInstall() {
