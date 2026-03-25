@@ -424,6 +424,83 @@
             min-width: 36px;
         }
 
+        /* Install Banner */
+        .install-banner {
+            position: fixed;
+            bottom: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1001;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+            transition: bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            max-width: 90vw;
+            width: 380px;
+        }
+        .install-banner.show {
+            bottom: 24px;
+        }
+        .install-banner-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #6c63ff, #e040fb);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+        .install-banner-text {
+            flex: 1;
+            min-width: 0;
+        }
+        .install-banner-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 2px;
+        }
+        .install-banner-desc {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+        }
+        .install-banner-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        .install-btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 18px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: opacity 0.2s;
+            white-space: nowrap;
+        }
+        .install-btn:hover { opacity: 0.85; }
+        .install-btn:active { transform: scale(0.96); }
+        .install-dismiss {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            font-size: 0.75rem;
+            padding: 2px 4px;
+        }
+        .install-dismiss:hover { color: var(--text); }
+
         /* Mobile Adaptation */
         @media (max-width: 768px) {
             body { padding: 12px; padding-top: env(safe-area-inset-top, 12px); }
@@ -454,6 +531,7 @@
             .card { padding: 14px; }
             .clock-time { font-size: 2rem; }
             .pomo-display { font-size: 1.8rem; }
+            .install-banner { width: calc(100vw - 24px); padding: 12px 14px; }
         }
         /* Safe area for notch phones */
         @supports (padding: env(safe-area-inset-bottom)) {
@@ -470,6 +548,19 @@
     </style>
 </head>
 <body>
+    <!-- Install Banner -->
+    <div class="install-banner" id="install-banner">
+        <div class="install-banner-icon">⚡</div>
+        <div class="install-banner-text">
+            <div class="install-banner-title">安装效率仪表盘</div>
+            <div class="install-banner-desc">添加到桌面，像 App 一样使用</div>
+        </div>
+        <div class="install-banner-actions">
+            <button class="install-btn" id="install-btn" onclick="installApp()">安装</button>
+            <button class="install-dismiss" onclick="dismissInstall()">以后再说</button>
+        </div>
+    </div>
+
     <!-- Theme Toggle -->
     <div class="theme-toggle" onclick="toggleTheme()" title="切换白天/夜晚模式">
         <span class="theme-toggle-label" id="theme-label">夜晚</span>
@@ -898,6 +989,52 @@
         pomoState.count = 0;
         localStorage.setItem('pomo_count_today', '0');
         localStorage.setItem('pomo_count_date', getTodayKey());
+    }
+
+    // ========== PWA Install ==========
+    let deferredPrompt = null;
+    const installBanner = document.getElementById('install-banner');
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        // Show banner after a short delay if not already dismissed
+        if (!localStorage.getItem('install_dismissed')) {
+            setTimeout(() => installBanner.classList.add('show'), 2000);
+        }
+    });
+
+    function installApp() {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then((choice) => {
+                if (choice.outcome === 'accepted') {
+                    console.log('App installed');
+                }
+                deferredPrompt = null;
+                installBanner.classList.remove('show');
+            });
+        }
+    }
+
+    function dismissInstall() {
+        installBanner.classList.remove('show');
+        localStorage.setItem('install_dismissed', 'true');
+    }
+
+    // Hide banner if already installed
+    window.addEventListener('appinstalled', () => {
+        installBanner.classList.remove('show');
+        deferredPrompt = null;
+    });
+
+    // For iOS Safari (no beforeinstallprompt)
+    const isIos = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+    if (isIos && !isStandalone && !localStorage.getItem('install_dismissed')) {
+        document.getElementById('install-btn').textContent = '添加';
+        document.querySelector('.install-banner-desc').textContent = '点击添加，然后选"添加到主屏幕"';
+        setTimeout(() => installBanner.classList.add('show'), 2000);
     }
 
     // ========== PWA Service Worker ==========
