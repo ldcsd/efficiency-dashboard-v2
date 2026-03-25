@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#6c63ff">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="效率仪表盘">
+    <meta name="description" content="个人效率管理工具 - 待办事项、番茄钟、习惯打卡">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+    <title>效率仪表盘</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #0f0f1a;
+            --card: #1a1a2e;
+            --border: #2a2a4a;
+            --text: #e0e0e0;
+            --text-dim: #8888aa;
+            --accent: #6c63ff;
+            --accent-glow: rgba(108, 99, 255, 0.3);
+            --danger: #ff6b6b;
+            --success: #51cf66;
+            --warning: #ffd43b;
+            --hover-bg: rgba(255,255,255,0.03);
+            --hover-bg-strong: rgba(255,255,255,0.06);
+        }
+        body.light {
+            --bg: #f0f2f5;
+            --card: #ffffff;
+            --border: #e0e3e8;
+            --text: #1a1a2e;
+            --text-dim: #6b7280;
+            --accent: #5b52d5;
+            --accent-glow: rgba(91, 82, 213, 0.15);
+            --danger: #e8453c;
+            --success: #40b35a;
+            --warning: #e6b800;
+            --hover-bg: rgba(0,0,0,0.03);
+            --hover-bg-strong: rgba(0,0,0,0.06);
+        }
+        body {
+            font-family: 'Segoe UI', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            font-size: 2rem;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #6c63ff, #e040fb);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle {
+            text-align: center;
+            color: var(--text-dim);
+            margin-bottom: 24px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(108, 99, 255, 0.15);
+        }
+        .card-title {
+            font-size: 1.1rem;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .card-title span.emoji { font-size: 1.3rem; }
+
+        /* Clock */
+        .clock-time {
+            font-size: 3.5rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+        }
+        .clock-date {
+            text-align: center;
+            color: var(--text-dim);
+            font-size: 1rem;
+            margin-top: 4px;
+        }
+        .clock-seconds {
+            text-align: center;
+            color: var(--accent);
+            font-size: 1.2rem;
+            margin-top: 2px;
+        }
+
+        /* Quote */
+        .quote-text {
+            font-style: italic;
+            line-height: 1.6;
+            color: var(--text);
+            font-size: 1.05rem;
+        }
+        .quote-author {
+            margin-top: 12px;
+            text-align: right;
+            color: var(--accent);
+            font-size: 0.9rem;
+        }
+
+        /* Todo */
+        .todo-input-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .todo-input-row input {
+            flex: 1;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: var(--text);
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .todo-input-row input:focus {
+            border-color: var(--accent);
+        }
+        .btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 18px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: opacity 0.2s;
+            white-space: nowrap;
+        }
+        .btn:hover { opacity: 0.85; }
+        .todo-list {
+            list-style: none;
+            max-height: 280px;
+            overflow-y: auto;
+        }
+        .todo-list::-webkit-scrollbar { width: 4px; }
+        .todo-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+        .todo-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            margin-bottom: 6px;
+            background: rgba(255,255,255,0.03);
+            transition: background 0.2s;
+        }
+        .todo-item:hover { background: var(--hover-bg-strong); }
+        .todo-item.done .todo-text {
+            text-decoration: line-through;
+            color: var(--text-dim);
+        }
+        .todo-checkbox {
+            width: 20px; height: 20px;
+            border: 2px solid var(--border);
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+            transition: all 0.2s;
+        }
+        .todo-checkbox.checked {
+            background: var(--success);
+            border-color: var(--success);
+        }
+        .todo-checkbox.checked::after {
+            content: '✓';
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .todo-text { flex: 1; font-size: 0.95rem; }
+        .todo-delete {
+            color: var(--danger);
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s;
+            font-size: 1.1rem;
+            background: none; border: none; padding: 4px;
+        }
+        .todo-item:hover .todo-delete { opacity: 0.7; }
+        .todo-delete:hover { opacity: 1 !important; }
+        .todo-stats {
+            display: flex;
+            gap: 16px;
+            margin-top: 12px;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+        }
+        .todo-stats span { color: var(--accent); font-weight: 600; }
+
+        /* Pomodoro */
+        .pomo-display {
+            text-align: center;
+            font-size: 3rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            margin: 16px 0;
+        }
+        .pomo-controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .pomo-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 8px;
+            padding: 8px 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        .pomo-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+        .pomo-btn:hover { border-color: var(--accent); }
+        .pomo-progress {
+            height: 4px;
+            background: var(--bg);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 12px;
+        }
+        .pomo-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), #e040fb);
+            border-radius: 2px;
+            transition: width 1s linear;
+        }
+        .pomo-label {
+            text-align: center;
+            color: var(--text-dim);
+            font-size: 0.85rem;
+        }
+
+        /* Notes */
+        .notes-area {
+            width: 100%;
+            height: 200px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px;
+            color: var(--text);
+            font-size: 0.95rem;
+            line-height: 1.6;
+            resize: vertical;
+            outline: none;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+        .notes-area:focus { border-color: var(--accent); }
+        .notes-info {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+        }
+
+        /* Habits */
+        .habit-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+        }
+        .habit-day-label {
+            text-align: center;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            padding: 4px;
+        }
+        .habit-day {
+            aspect-ratio: 1;
+            border-radius: 6px;
+            background: var(--bg);
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+        }
+        .habit-day:hover { border-color: var(--accent); }
+        .habit-day.filled {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+        .habit-add-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .habit-name-input {
+            flex: 1;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 12px;
+            color: var(--text);
+            font-size: 0.9rem;
+            outline: none;
+        }
+        .habit-name-input:focus { border-color: var(--accent); }
+        .habit-item {
+            margin-bottom: 14px;
+        }
+        .habit-item-name {
+            font-size: 0.9rem;
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .habit-streak {
+            font-size: 0.8rem;
+            color: var(--warning);
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .card { animation: fadeIn 0.4s ease-out backwards; }
+        .card:nth-child(1) { animation-delay: 0.05s; }
+        .card:nth-child(2) { animation-delay: 0.1s; }
+        .card:nth-child(3) { animation-delay: 0.15s; }
+        .card:nth-child(4) { animation-delay: 0.2s; }
+        .card:nth-child(5) { animation-delay: 0.25s; }
+        .card:nth-child(6) { animation-delay: 0.3s; }
+
+        /* Theme Toggle */
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 50px;
+            padding: 8px 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+        }
+        .theme-toggle:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 24px rgba(108, 99, 255, 0.2);
+        }
+        .theme-toggle-track {
+            width: 48px;
+            height: 26px;
+            border-radius: 13px;
+            background: var(--border);
+            position: relative;
+            transition: background 0.3s;
+        }
+        .theme-toggle-track.active {
+            background: var(--accent);
+        }
+        .theme-toggle-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            transition: transform 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .theme-toggle-track.active .theme-toggle-thumb {
+            transform: translateX(22px);
+        }
+        .theme-toggle-label {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            user-select: none;
+            min-width: 36px;
+        }
+
+        /* Mobile Adaptation */
+        @media (max-width: 768px) {
+            body { padding: 12px; padding-top: env(safe-area-inset-top, 12px); }
+            h1 { font-size: 1.5rem; margin-bottom: 4px; }
+            .subtitle { margin-bottom: 16px; font-size: 0.9rem; }
+            .grid {
+                grid-template-columns: 1fr;
+                gap: 14px;
+            }
+            .card { padding: 18px; border-radius: 12px; }
+            .clock-time { font-size: 2.5rem; }
+            .pomo-display { font-size: 2.2rem; }
+            .theme-toggle {
+                top: auto;
+                bottom: 16px;
+                right: 16px;
+                padding: 6px 12px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+            }
+            .theme-toggle-track { width: 42px; height: 22px; }
+            .theme-toggle-thumb { width: 16px; height: 16px; }
+            .theme-toggle-track.active .theme-toggle-thumb { transform: translateX(20px); }
+            .todo-item .todo-delete { opacity: 0.5; }
+            .container { padding-bottom: 70px; }
+        }
+        @media (max-width: 380px) {
+            .grid { gap: 10px; }
+            .card { padding: 14px; }
+            .clock-time { font-size: 2rem; }
+            .pomo-display { font-size: 1.8rem; }
+        }
+        /* Safe area for notch phones */
+        @supports (padding: env(safe-area-inset-bottom)) {
+            body { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+        }
+        /* Touch feedback */
+        @media (hover: none) and (pointer: coarse) {
+            .btn, .pomo-btn, .todo-checkbox, .habit-day, .theme-toggle {
+                -webkit-tap-highlight-color: transparent;
+            }
+            .btn:active { opacity: 0.7; transform: scale(0.97); }
+            .pomo-btn:active { transform: scale(0.97); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Theme Toggle -->
+    <div class="theme-toggle" onclick="toggleTheme()" title="切换白天/夜晚模式">
+        <span class="theme-toggle-label" id="theme-label">夜晚</span>
+        <div class="theme-toggle-track" id="theme-track">
+            <div class="theme-toggle-thumb" id="theme-thumb">🌙</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h1>⚡ 效率仪表盘</h1>
+        <p class="subtitle" id="greeting"></p>
+
+        <div class="grid">
+            <!-- Clock -->
+            <div class="card">
+                <div class="card-title"><span class="emoji">🕐</span> 时钟</div>
+                <div class="clock-time" id="clock">--:--</div>
+                <div class="clock-date" id="date-display"></div>
+                <div class="clock-seconds" id="seconds"></div>
+            </div>
+
+            <!-- Quote -->
+            <div class="card">
+                <div class="card-title"><span class="emoji">💡</span> 每日灵感</div>
+                <div class="quote-text" id="quote-text"></div>
+                <div class="quote-author" id="quote-author"></div>
+            </div>
+
+            <!-- Todo -->
+            <div class="card">
+                <div class="card-title"><span class="emoji">✅</span> 待办事项</div>
+                <div class="todo-input-row">
+                    <input type="text" id="todo-input" placeholder="添加新任务..." />
+                    <button class="btn" onclick="addTodo()">添加</button>
+                </div>
+                <ul class="todo-list" id="todo-list"></ul>
+                <div class="todo-stats">
+                    <div>总计: <span id="stat-total">0</span></div>
+                    <div>完成: <span id="stat-done">0</span></div>
+                    <div>完成率: <span id="stat-rate">0%</span></div>
+                </div>
+            </div>
+
+            <!-- Pomodoro -->
+            <div class="card">
+                <div class="card-title"><span class="emoji">🍅</span> 番茄钟</div>
+                <div class="pomo-label" id="pomo-mode">专注模式</div>
+                <div class="pomo-display" id="pomo-display">25:00</div>
+                <div class="pomo-controls">
+                    <button class="pomo-btn" onclick="togglePomo()" id="pomo-toggle">开始</button>
+                    <button class="pomo-btn" onclick="resetPomo()">重置</button>
+                    <button class="pomo-btn" onclick="switchMode()" id="pomo-mode-btn">休息</button>
+                </div>
+                <div class="pomo-progress">
+                    <div class="pomo-progress-bar" id="pomo-bar" style="width:100%"></div>
+                </div>
+                <div class="todo-stats" style="margin-top:12px;justify-content:center;">
+                    今日番茄: <span id="pomo-count">0</span>
+                </div>
+            </div>
+
+            <!-- Notes -->
+            <div class="card">
+                <div class="card-title"><span class="emoji">📝</span> 快捷便签</div>
+                <textarea class="notes-area" id="notes" placeholder="随手记点什么..."></textarea>
+                <div class="notes-info">
+                    <span>自动保存</span>
+                    <span id="char-count">0 字</span>
+                </div>
+            </div>
+
+            <!-- Habit Tracker -->
+            <div class="card">
+                <div class="card-title"><span class="emoji">🔥</span> 习惯打卡</div>
+                <div class="habit-add-row">
+                    <input type="text" class="habit-name-input" id="habit-input" placeholder="新习惯名称..." />
+                    <button class="btn" onclick="addHabit()">添加</button>
+                </div>
+                <div id="habit-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ========== Quotes ==========
+    const quotes = [
+        { text: '唯一做伟大工作的方法，就是热爱你所做的。', author: 'Steve Jobs' },
+        { text: '不要等待完美的时刻，而是抓住当下的时刻，让它变得完美。', author: '未知' },
+        { text: '你的时间有限，不要浪费在过别人的生活上。', author: 'Steve Jobs' },
+        { text: '成功不是终点，失败也不是终结，唯有继续前行才是最重要的。', author: 'Winston Churchill' },
+        { text: '种一棵树最好的时间是十年前，其次是现在。', author: '中国谚语' },
+        { text: '简单是终极的复杂。', author: 'Leonardo da Vinci' },
+        { text: '学而不思则罔，思而不学则殆。', author: '孔子' },
+        { text: '千里之行，始于足下。', author: '老子' },
+        { text: '不积跬步，无以至千里。', author: '荀子' },
+        { text: '生活中最重要的事情，是确定一个伟大的目标，并决心实现它。', author: 'Goethe' },
+        { text: '把每一天当作生命的最后一天来过，总有一天你会发现自己是对的。', author: 'Steve Jobs' },
+        { text: '知之者不如好之者，好之者不如乐之者。', author: '孔子' },
+    ];
+
+    function showQuote() {
+        const q = quotes[Math.floor(Math.random() * quotes.length)];
+        document.getElementById('quote-text').textContent = `"${q.text}"`;
+        document.getElementById('quote-author').textContent = `— ${q.author}`;
+    }
+
+    // ========== Clock ==========
+    const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
+    function updateClock() {
+        const now = new Date();
+        const h = String(now.getHours()).padStart(2, '0');
+        const m = String(now.getMinutes()).padStart(2, '0');
+        const s = String(now.getSeconds()).padStart(2, '0');
+        document.getElementById('clock').textContent = `${h}:${m}`;
+        document.getElementById('seconds').textContent = s + 's';
+        document.getElementById('date-display').textContent =
+            `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日 星期${weekDays[now.getDay()]}`;
+    }
+
+    // ========== Greeting ==========
+    function setGreeting() {
+        const h = new Date().getHours();
+        let g = '夜深了，注意休息 🌙';
+        if (h >= 6 && h < 12) g = '早上好，新的一天开始了 🌅';
+        else if (h >= 12 && h < 14) g = '中午好，记得吃饭 🍱';
+        else if (h >= 14 && h < 18) g = '下午好，保持专注 💪';
+        else if (h >= 18 && h < 22) g = '晚上好，辛苦了 🌆';
+        document.getElementById('greeting').textContent = g;
+    }
+
+    // ========== Todo ==========
+    let todos = JSON.parse(localStorage.getItem('dashboard_todos') || '[]');
+
+    function saveTodos() {
+        localStorage.setItem('dashboard_todos', JSON.stringify(todos));
+    }
+
+    function renderTodos() {
+        const list = document.getElementById('todo-list');
+        list.innerHTML = '';
+        todos.forEach((t, i) => {
+            const li = document.createElement('li');
+            li.className = 'todo-item' + (t.done ? ' done' : '');
+            li.innerHTML = `
+                <div class="todo-checkbox ${t.done?'checked':''}" onclick="toggleTodo(${i})"></div>
+                <span class="todo-text">${escapeHtml(t.text)}</span>
+                <button class="todo-delete" onclick="deleteTodo(${i})">✕</button>
+            `;
+            list.appendChild(li);
+        });
+        const total = todos.length;
+        const done = todos.filter(t => t.done).length;
+        document.getElementById('stat-total').textContent = total;
+        document.getElementById('stat-done').textContent = done;
+        document.getElementById('stat-rate').textContent = total ? Math.round(done/total*100) + '%' : '0%';
+    }
+
+    function addTodo() {
+        const input = document.getElementById('todo-input');
+        const text = input.value.trim();
+        if (!text) return;
+        todos.unshift({ text, done: false });
+        input.value = '';
+        saveTodos();
+        renderTodos();
+    }
+
+    function toggleTodo(i) {
+        todos[i].done = !todos[i].done;
+        saveTodos();
+        renderTodos();
+    }
+
+    function deleteTodo(i) {
+        todos.splice(i, 1);
+        saveTodos();
+        renderTodos();
+    }
+
+    document.getElementById('todo-input').addEventListener('keydown', e => {
+        if (e.key === 'Enter') addTodo();
+    });
+
+    // ========== Pomodoro ==========
+    let pomoState = {
+        running: false,
+        mode: 'focus', // 'focus' or 'break'
+        timeLeft: 25 * 60,
+        totalTime: 25 * 60,
+        count: parseInt(localStorage.getItem('pomo_count_today') || '0'),
+        interval: null
+    };
+
+    function renderPomo() {
+        const m = String(Math.floor(pomoState.timeLeft / 60)).padStart(2, '0');
+        const s = String(pomoState.timeLeft % 60).padStart(2, '0');
+        document.getElementById('pomo-display').textContent = `${m}:${s}`;
+        document.getElementById('pomo-toggle').textContent = pomoState.running ? '暂停' : '开始';
+        document.getElementById('pomo-mode').textContent = pomoState.mode === 'focus' ? '专注模式' : '休息模式';
+        document.getElementById('pomo-mode-btn').textContent = pomoState.mode === 'focus' ? '休息' : '专注';
+        document.getElementById('pomo-count').textContent = pomoState.count;
+        const pct = pomoState.totalTime > 0 ? (pomoState.timeLeft / pomoState.totalTime * 100) : 0;
+        document.getElementById('pomo-bar').style.width = pct + '%';
+    }
+
+    function togglePomo() {
+        if (pomoState.running) {
+            clearInterval(pomoState.interval);
+            pomoState.running = false;
+        } else {
+            pomoState.running = true;
+            pomoState.interval = setInterval(() => {
+                pomoState.timeLeft--;
+                if (pomoState.timeLeft <= 0) {
+                    clearInterval(pomoState.interval);
+                    pomoState.running = false;
+                    if (pomoState.mode === 'focus') {
+                        pomoState.count++;
+                        localStorage.setItem('pomo_count_today', pomoState.count);
+                        try { new Audio('data:audio/wav;base64,UklGRl9vT19telefonXEZTQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU' + 'A'.repeat(100)).play(); } catch(e) {}
+                        alert('🍅 番茄时间结束！休息一下吧~');
+                    } else {
+                        alert('☕ 休息结束！继续加油~');
+                    }
+                    switchMode();
+                }
+                renderPomo();
+            }, 1000);
+        }
+        renderPomo();
+    }
+
+    function resetPomo() {
+        clearInterval(pomoState.interval);
+        pomoState.running = false;
+        pomoState.timeLeft = pomoState.mode === 'focus' ? 25*60 : 5*60;
+        pomoState.totalTime = pomoState.timeLeft;
+        renderPomo();
+    }
+
+    function switchMode() {
+        clearInterval(pomoState.interval);
+        pomoState.running = false;
+        pomoState.mode = pomoState.mode === 'focus' ? 'break' : 'focus';
+        pomoState.totalTime = pomoState.mode === 'focus' ? 25*60 : 5*60;
+        pomoState.timeLeft = pomoState.totalTime;
+        renderPomo();
+    }
+
+    // ========== Notes ==========
+    const notesEl = document.getElementById('notes');
+    notesEl.value = localStorage.getItem('dashboard_notes') || '';
+    notesEl.addEventListener('input', () => {
+        localStorage.setItem('dashboard_notes', notesEl.value);
+        document.getElementById('char-count').textContent = notesEl.value.length + ' 字';
+    });
+    document.getElementById('char-count').textContent = notesEl.value.length + ' 字';
+
+    // ========== Habit Tracker ==========
+    let habits = JSON.parse(localStorage.getItem('dashboard_habits') || '[]');
+
+    function getTodayKey() {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+
+    function getLast7Days() {
+        const days = [];
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            days.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+        }
+        return days;
+    }
+
+    function getDayLabel(key) {
+        const d = new Date(key);
+        const labels = ['日','一','二','三','四','五','六'];
+        return `${d.getMonth()+1}/${d.getDate()} ${labels[d.getDay()]}`;
+    }
+
+    function saveHabits() {
+        localStorage.setItem('dashboard_habits', JSON.stringify(habits));
+    }
+
+    function renderHabits() {
+        const container = document.getElementById('habit-list');
+        container.innerHTML = '';
+        const days = getLast7Days();
+        const dayLabels = ['一','二','三','四','五','六','日'];
+
+        habits.forEach((habit, hi) => {
+            const div = document.createElement('div');
+            div.className = 'habit-item';
+
+            // Calculate streak
+            let streak = 0;
+            const today = new Date();
+            for (let i = 0; i < 365; i++) {
+                const d = new Date(today);
+                d.setDate(d.getDate() - i);
+                const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                if (habit.checkedDays && habit.checkedDays.includes(key)) {
+                    streak++;
+                } else {
+                    break;
+                }
+            }
+
+            div.innerHTML = `
+                <div class="habit-item-name">
+                    <span>${escapeHtml(habit.name)}</span>
+                    <span class="habit-streak">🔥 ${streak}天</span>
+                </div>
+                <div class="habit-grid">
+                    ${dayLabels.map((l, di) => `<div class="habit-day-label">${l}</div>`).join('')}
+                    ${days.map(day => {
+                        const filled = habit.checkedDays && habit.checkedDays.includes(day);
+                        return `<div class="habit-day ${filled?'filled':''}" onclick="toggleHabit(${hi},'${day}')">${filled?'✓':''}</div>`;
+                    }).join('')}
+                </div>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function addHabit() {
+        const input = document.getElementById('habit-input');
+        const name = input.value.trim();
+        if (!name) return;
+        habits.push({ name, checkedDays: [] });
+        input.value = '';
+        saveHabits();
+        renderHabits();
+    }
+
+    function toggleHabit(hi, day) {
+        if (!habits[hi].checkedDays) habits[hi].checkedDays = [];
+        const idx = habits[hi].checkedDays.indexOf(day);
+        if (idx >= 0) {
+            habits[hi].checkedDays.splice(idx, 1);
+        } else {
+            habits[hi].checkedDays.push(day);
+        }
+        saveHabits();
+        renderHabits();
+    }
+
+    document.getElementById('habit-input').addEventListener('keydown', e => {
+        if (e.key === 'Enter') addHabit();
+    });
+
+    // ========== Theme Toggle ==========
+    let currentTheme = localStorage.getItem('dashboard_theme') || 'auto';
+
+    function getAutoTheme() {
+        const h = new Date().getHours();
+        return (h >= 6 && h < 18) ? 'light' : 'dark';
+    }
+
+    function applyTheme(theme) {
+        let actual = theme;
+        if (theme === 'auto') {
+            actual = getAutoTheme();
+        }
+
+        if (actual === 'light') {
+            document.body.classList.add('light');
+        } else {
+            document.body.classList.remove('light');
+        }
+
+        const track = document.getElementById('theme-track');
+        const thumb = document.getElementById('theme-thumb');
+        const label = document.getElementById('theme-label');
+
+        if (actual === 'light') {
+            track.classList.add('active');
+            thumb.textContent = '☀️';
+            label.textContent = '白天';
+        } else {
+            track.classList.remove('active');
+            thumb.textContent = '🌙';
+            label.textContent = '夜晚';
+        }
+    }
+
+    function toggleTheme() {
+        // Cycle: auto -> light -> dark -> auto
+        if (currentTheme === 'auto') {
+            currentTheme = 'light';
+        } else if (currentTheme === 'light') {
+            currentTheme = 'dark';
+        } else {
+            currentTheme = 'auto';
+        }
+        localStorage.setItem('dashboard_theme', currentTheme);
+        applyTheme(currentTheme);
+    }
+
+    // ========== Utility ==========
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    // ========== Init ==========
+    applyTheme(currentTheme);
+    showQuote();
+    updateClock();
+    setGreeting();
+    renderTodos();
+    renderPomo();
+    renderHabits();
+    setInterval(updateClock, 1000);
+    // Auto-check theme every minute
+    setInterval(() => {
+        if (currentTheme === 'auto') applyTheme('auto');
+    }, 60000);
+
+    // Reset pomodoro count on new day
+    const savedPomoDate = localStorage.getItem('pomo_count_date');
+    if (savedPomoDate !== getTodayKey()) {
+        pomoState.count = 0;
+        localStorage.setItem('pomo_count_today', '0');
+        localStorage.setItem('pomo_count_date', getTodayKey());
+    }
+
+    // ========== PWA Service Worker ==========
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./service-worker.js')
+                .then(reg => console.log('SW registered:', reg.scope))
+                .catch(err => console.log('SW registration failed:', err));
+        });
+    }
+    </script>
+</body>
+</html>
